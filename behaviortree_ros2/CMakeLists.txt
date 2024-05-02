@@ -26,8 +26,8 @@ ament_target_dependencies(${PROJECT_NAME} ${THIS_PACKAGE_DEPS})
 ######################################################
 # INSTALL
 
-install(DIRECTORY include/  DESTINATION include/) 
-        
+install(DIRECTORY include/  DESTINATION include/)
+
 ament_export_include_directories(include)
 ament_export_dependencies(${THIS_PACKAGE_DEPS})
 

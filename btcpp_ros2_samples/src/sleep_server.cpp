@@ -13,32 +13,30 @@ public:
   using Sleep = btcpp_ros2_interfaces::action::Sleep;
   using GoalHandleSleep = rclcpp_action::ServerGoalHandle<Sleep>;
 
-  explicit SleepActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  explicit SleepActionServer(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
     : Node("sleep_action_server", options)
   {
     using namespace std::placeholders;
 
     this->action_server_ = rclcpp_action::create_server<Sleep>(
-      this,
-      "sleep_service",
-      std::bind(&SleepActionServer::handle_goal, this, _1, _2),
-      std::bind(&SleepActionServer::handle_cancel, this, _1),
-      std::bind(&SleepActionServer::handle_accepted, this, _1));
+        this, "sleep_service", std::bind(&SleepActionServer::handle_goal, this, _1, _2),
+        std::bind(&SleepActionServer::handle_cancel, this, _1),
+        std::bind(&SleepActionServer::handle_accepted, this, _1));
   }
 
 private:
   rclcpp_action::Server<Sleep>::SharedPtr action_server_;
 
-  rclcpp_action::GoalResponse handle_goal(
-    const rclcpp_action::GoalUUID &,
-    std::shared_ptr<const Sleep::Goal> goal)
+  rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID&,
+                                          std::shared_ptr<const Sleep::Goal> goal)
   {
-    RCLCPP_INFO(this->get_logger(), "Received goal request with sleep time %d", goal->msec_timeout);
+    RCLCPP_INFO(this->get_logger(), "Received goal request with sleep time %d",
+                goal->msec_timeout);
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   }
 
-  rclcpp_action::CancelResponse handle_cancel(
-    const std::shared_ptr<GoalHandleSleep> goal_handle)
+  rclcpp_action::CancelResponse
+  handle_cancel(const std::shared_ptr<GoalHandleSleep> goal_handle)
   {
     RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
     (void)goal_handle;
@@ -49,7 +47,7 @@ private:
   {
     using namespace std::placeholders;
     // this needs to return quickly to avoid blocking the executor, so spin up a new thread
-    std::thread{std::bind(&SleepActionServer::execute, this, _1), goal_handle}.detach();
+    std::thread{ std::bind(&SleepActionServer::execute, this, _1), goal_handle }.detach();
   }
 
   void execute(const std::shared_ptr<GoalHandleSleep> goal_handle)
@@ -60,12 +58,13 @@ private:
     auto feedback = std::make_shared<Sleep::Feedback>();
     auto result = std::make_shared<Sleep::Result>();
 
-    rclcpp::Time deadline = get_clock()->now() + rclcpp::Duration::from_seconds( double(goal->msec_timeout) / 1000 );
+    rclcpp::Time deadline = get_clock()->now() + rclcpp::Duration::from_seconds(
+                                                     double(goal->msec_timeout) / 1000);
     int cycle = 0;
 
-    while( get_clock()->now() < deadline )
+    while(get_clock()->now() < deadline)
     {
-      if (goal_handle->is_canceling())
+      if(goal_handle->is_canceling())
       {
         result->done = false;
         goal_handle->canceled(result);
@@ -81,7 +80,7 @@ private:
     }
 
     // Check if goal is done
-    if (rclcpp::ok())
+    if(rclcpp::ok())
     {
       result->done = true;
       goal_handle->succeed(result);
@@ -89,7 +88,6 @@ private:
     }
   }
 };  // class SleepActionServer
-
 
 int main(int argc, char** argv)
 {

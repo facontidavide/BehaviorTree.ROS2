@@ -24,7 +24,7 @@ namespace BT
 
 struct RosNodeParams
 {
-  std::shared_ptr<rclcpp::Node> nh;
+  std::weak_ptr<rclcpp::Node> nh;
 
   // This has different meaning based on the context:
   //
@@ -42,4 +42,4 @@ struct RosNodeParams
   std::chrono::milliseconds wait_for_server_timeout = std::chrono::milliseconds(500);
 };
 
-}
+}  // namespace BT

@@ -3,18 +3,17 @@
 
 using namespace BT;
 
-class SleepAction: public RosActionNode<btcpp_ros2_interfaces::action::Sleep>
+class SleepAction : public RosActionNode<btcpp_ros2_interfaces::action::Sleep>
 {
 public:
-  SleepAction(const std::string& name,
-              const NodeConfig& conf,
+  SleepAction(const std::string& name, const NodeConfig& conf,
               const RosNodeParams& params)
     : RosActionNode<btcpp_ros2_interfaces::action::Sleep>(name, conf, params)
   {}
 
   static BT::PortsList providedPorts()
   {
-    return providedBasicPorts({InputPort<unsigned>("msec")});
+    return providedBasicPorts({ InputPort<unsigned>("msec") });
   }
 
   bool setGoal(Goal& goal) override;

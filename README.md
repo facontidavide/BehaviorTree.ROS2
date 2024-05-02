@@ -29,5 +29,3 @@ wrap your Nodes into plugins that can be loaded at run-time.
 A lot of code is either inspired or copied from [Nav2](https://navigation.ros.org/).
 
 For this reason, we retain the same license and copyright.
-
-

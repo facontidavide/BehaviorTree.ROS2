@@ -20,7 +20,6 @@
 #include "behaviortree_cpp/utils/shared_library.h"
 #include "behaviortree_ros2/ros_node_params.hpp"
 
-
 // Use this macro to generate a plugin for:
 //
 // - BT::RosActionNode
@@ -34,14 +33,12 @@
 // Usage example:
 //   CreateRosNodePlugin(MyClassName, "MyClassName");
 
-#define CreateRosNodePlugin(TYPE, REGISTRATION_NAME)            \
-BTCPP_EXPORT void                                               \
-BT_RegisterRosNodeFromPlugin(BT::BehaviorTreeFactory& factory,  \
-                             const BT::RosNodeParams& params)   \
-{                                                               \
-  factory.registerNodeType<TYPE>(REGISTRATION_NAME, params);    \
-}                                                               \
-
+#define CreateRosNodePlugin(TYPE, REGISTRATION_NAME)                                     \
+  BTCPP_EXPORT void BT_RegisterRosNodeFromPlugin(BT::BehaviorTreeFactory& factory,       \
+                                                 const BT::RosNodeParams& params)        \
+  {                                                                                      \
+    factory.registerNodeType<TYPE>(REGISTRATION_NAME, params);                           \
+  }
 
 /**
  * @brief RegisterRosNode function used to load a plugin and register
@@ -51,18 +48,12 @@ BT_RegisterRosNodeFromPlugin(BT::BehaviorTreeFactory& factory,  \
  * @param filepath  path to the plugin.
  * @param params    parameters to pass to the instances of the Node.
  */
-inline
-void RegisterRosNode(BT::BehaviorTreeFactory& factory,
-                     const std::filesystem::path& filepath,
-                     const BT::RosNodeParams& params)
+inline void RegisterRosNode(BT::BehaviorTreeFactory& factory,
+                            const std::filesystem::path& filepath,
+                            const BT::RosNodeParams& params)
 {
   BT::SharedLibrary loader(filepath.generic_string());
-  typedef void (*Func)(BT::BehaviorTreeFactory&,
-                       const BT::RosNodeParams&);
+  typedef void (*Func)(BT::BehaviorTreeFactory&, const BT::RosNodeParams&);
   auto func = (Func)loader.getSymbol("BT_RegisterRosNodeFromPlugin");
   func(factory, params);
 }
-
-
-
-

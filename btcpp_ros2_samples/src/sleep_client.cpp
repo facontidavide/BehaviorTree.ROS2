@@ -18,29 +18,34 @@ class PrintValue : public BT::SyncActionNode
 {
 public:
   PrintValue(const std::string& name, const BT::NodeConfig& config)
-  : BT::SyncActionNode(name, config) {}
+    : BT::SyncActionNode(name, config)
+  {}
 
-  BT::NodeStatus tick() override {
+  BT::NodeStatus tick() override
+  {
     std::string msg;
-    if( getInput("message", msg ) ){
+    if(getInput("message", msg))
+    {
       std::cout << "PrintValue: " << msg << std::endl;
       return NodeStatus::SUCCESS;
     }
-    else{
-      std::cout << "PrintValue FAILED "<< std::endl;
+    else
+    {
+      std::cout << "PrintValue FAILED " << std::endl;
       return NodeStatus::FAILURE;
     }
   }
 
-  static BT::PortsList providedPorts() {
+  static BT::PortsList providedPorts()
+  {
     return { BT::InputPort<std::string>("message") };
   }
 };
 
 //-----------------------------------------------------
 
-  // Simple tree, used to execute once each action.
-  static const char* xml_text = R"(
+// Simple tree, used to execute once each action.
+static const char* xml_text = R"(
  <root BTCPP_format="4">
      <BehaviorTree>
         <Sequence>
@@ -58,7 +63,7 @@ public:
  </root>
  )";
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
   auto nh = std::make_shared<rclcpp::Node>("sleep_client");
@@ -79,7 +84,8 @@ int main(int argc, char **argv)
 
   auto tree = factory.createTreeFromText(xml_text);
 
-  for(int i=0; i<5; i++){
+  for(int i = 0; i < 5; i++)
+  {
     tree.tickWhileRunning();
   }
 
