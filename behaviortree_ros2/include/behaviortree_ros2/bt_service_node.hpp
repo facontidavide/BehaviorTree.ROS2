@@ -96,11 +96,13 @@ public:
    */
   static PortsList providedBasicPorts(PortsList addition)
   {
-    PortsList basic = {
-      InputPort<std::string>("service_name", "__default__placeholder__", "Service name"),
-      InputPort<int>("server_timeout", "Service server goal timeout (mSec)"),
-      InputPort<int>("wait_for_server_timeout", "Service server discovery timeout (mSec)")
-    };
+    PortsList basic = { InputPort<std::string>("service_name", "__default__placeholder__",
+                                               "Service name"),
+                        InputPort<int>("server_timeout", "Service server goal timeout "
+                                                         "(mSec)"),
+                        InputPort<int>("wait_for_server_timeout", "Service server "
+                                                                  "discovery timeout "
+                                                                  "(mSec)") };
     basic.insert(addition.begin(), addition.end());
     return basic;
   }
@@ -236,12 +238,16 @@ inline RosServiceNode<T>::RosServiceNode(const std::string& instance_name,
   {
     int timeout = 0;
     getInput("server_timeout", timeout);
-    if(timeout > 0) {
+    if(timeout > 0)
+    {
       service_timeout_ = std::chrono::milliseconds(timeout);
     }
-    else {
-      RCLCPP_WARN(node_->get_logger(), "%s: Port `server_timeout` is not greater than zero. "
-                  "Defaulting to %d mSec.", name().c_str(), static_cast<int>(service_timeout_.count()));
+    else
+    {
+      RCLCPP_WARN(logger(),
+                  "%s: Port `server_timeout` is not greater than zero. "
+                  "Defaulting to %d mSec.",
+                  name().c_str(), static_cast<int>(service_timeout_.count()));
     }
   }
   // update wait_for_service_timeout_ if set throuh port and greater than 0
@@ -250,12 +256,16 @@ inline RosServiceNode<T>::RosServiceNode(const std::string& instance_name,
   {
     int timeout = 0;
     getInput("wait_for_server_timeout", timeout);
-    if(timeout > 0) {
+    if(timeout > 0)
+    {
       wait_for_service_timeout_ = std::chrono::milliseconds(timeout);
     }
-    else {
-      RCLCPP_WARN(node_->get_logger(), "%s: Port `wait_for_server_timeout` is not greater than zero. "
-                  "Defaulting to %d mSec.", name().c_str(), static_cast<int>(wait_for_service_timeout_.count()));
+    else
+    {
+      RCLCPP_WARN(logger(),
+                  "%s: Port `wait_for_server_timeout` is not greater than zero. "
+                  "Defaulting to %d mSec.",
+                  name().c_str(), static_cast<int>(wait_for_service_timeout_.count()));
     }
   }
 
