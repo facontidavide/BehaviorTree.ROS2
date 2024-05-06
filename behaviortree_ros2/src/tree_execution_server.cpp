@@ -91,7 +91,6 @@ TreeExecutionServer::TreeExecutionServer(const rclcpp::NodeOptions& options)
 
   // register the users Plugins and BehaviorTree.xml files into the factory
   RegisterBehaviorTrees(p_->params, p_->factory, p_->node);
-  registerNodesIntoFactory(p_->factory);
 }
 
 rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
@@ -142,14 +141,6 @@ void TreeExecutionServer::execute(
   const auto goal = goal_handle->get_goal();
   BT::NodeStatus status = BT::NodeStatus::RUNNING;
   auto action_result = std::make_shared<ExecuteTree::Result>();
-
-  // Before executing check if we have new Behaviors or Subtrees to reload
-  if(p_->param_listener->is_old(p_->params))
-  {
-    p_->params = p_->param_listener->get_params();
-    RegisterBehaviorTrees(p_->params, p_->factory, p_->node);
-    registerNodesIntoFactory(p_->factory);
-  }
 
   // Loop until something happens with ROS or the node completes
   try
@@ -260,6 +251,11 @@ BT::Tree* TreeExecutionServer::currentTree()
 BT::Blackboard::Ptr TreeExecutionServer::globalBlackboard()
 {
   return p_->global_blackboard;
+}
+
+BT::BehaviorTreeFactory& TreeExecutionServer::factory()
+{
+  return p_->factory;
 }
 
 }  // namespace BT

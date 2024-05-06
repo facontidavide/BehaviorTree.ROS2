@@ -26,6 +26,7 @@ bt_server:
   plugins: {
     type: string_array,
     default_value: [],
+    read_only: true,
     description: "List of 'package_name/subfolder' containing BehaviorTree plugins to load into the factory",
     validation: {
       unique<>: null,
@@ -34,6 +35,7 @@ bt_server:
   ros_plugins_timeout: {
     type: int,
     default_value: 1000,
+    read_only: true,
     description: "Timeout (ms) used in BT::RosNodeParams",
     validation: {
       bounds<>: [1, 10000]

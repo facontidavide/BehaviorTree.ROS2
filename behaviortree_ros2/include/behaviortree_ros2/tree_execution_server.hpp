@@ -65,6 +65,9 @@ public:
   // pointer to the global blackboard
   BT::Blackboard::Ptr globalBlackboard();
 
+  // reference to the factory, to allow users to register custom nodes
+  BT::BehaviorTreeFactory& factory();
+
 protected:
   /**
    * @brief Callback invoked after the tree is created.
@@ -73,16 +76,6 @@ protected:
    * @param tree The tree that was created
   */
   virtual void onTreeCreated(BT::Tree& tree)
-  {}
-
-  /**
-   * @brief registerNodesIntoFactory is a callback invoked after the
-   * plugins were registered into the BT::BehaviorTreeFactory.
-   * It can be used to register additional custom nodes manually.
-   *
-   * @param factory The factory to use to register nodes
-  */
-  virtual void registerNodesIntoFactory(BT::BehaviorTreeFactory& factory)
   {}
 
   /**

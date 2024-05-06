@@ -18,10 +18,13 @@ Furthermore, the user can customize it to:
 
 - Register custom BT Nodes directly (static linking).
 - Attach additional loggers. The **Groot2** publisher will be attached by default.
-- Use the "global blackboard", a new idiom/pattern explained in [this tutorial](https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/examples/t19_global_blackboard.cpp).
+- Use the "global blackboard", a new idiom/pattern explained in [this tutorial](https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/examples/t16_global_blackboard.cpp).
 - Customize the feedback of the `rclcpp_action::Server`.
 
-## Customization points
+If you want to register manually a custom Node or an enum,
+you can access the factory directly using the public method `TreeExecutionServer::factory()`.
+
+## Virtual methods
 
 These are the virtual method of `TreeExecutionServer` that can be overridden by the user.
 
@@ -30,12 +33,6 @@ These are the virtual method of `TreeExecutionServer` that can be overridden by 
 Callback invoked when a tree is created; this happens after `rclcpp_action::Server` receive a command from a client.
 
 It can be used, for instance, to initialize a logger or the global blackboard.
-
-###  void registerNodesIntoFactory(BT::BehaviorTreeFactory& factory)
-
-Called at the beginning, after all the plugins have been loaded.
-
-It can be used to register programmatically more BT.CPP Nodes.
 
 ### std::optional<BT::NodeStatus> onLoopAfterTick(BT::NodeStatus status)
 
