@@ -44,11 +44,13 @@ public:
     logger_cout_ = std::make_shared<BT::StdCoutLogger>(tree);
   }
 
-  void onTreeExecutionCompleted(BT::NodeStatus status, bool was_cancelled) override
+  std::optional<std::string> onTreeExecutionCompleted(BT::NodeStatus status,
+                                                      bool was_cancelled) override
   {
     // NOT really needed, even if logger_cout_ may contain a dangling pointer of the tree
     // at this point
     logger_cout_.reset();
+    return std::nullopt;
   }
 
 private:

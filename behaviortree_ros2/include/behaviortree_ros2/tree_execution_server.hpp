@@ -61,10 +61,13 @@ public:
   rclcpp::Node::SharedPtr node();
 
   /// @brief Name of the tree being executed
-  const std::string& currentTreeName() const;
+  const std::string& treeName() const;
+
+  /// @brief The payload received in the last goal
+  const std::string& goalPayload() const;
 
   /// @brief Tree being executed, nullptr if it doesn't exist, yet.
-  BT::Tree* currentTree();
+  BT::Tree* tree();
 
   /// @brief Pointer to the global blackboard
   BT::Blackboard::Ptr globalBlackboard();
@@ -110,9 +113,14 @@ protected:
    *
    * @param status The status of the tree after the last tick
    * @param was_cancelled True if the action was cancelled by the Action Client
+   *
+   * @return if not std::nullopt, the string will be sent as [return_message] to the Action Client.
   */
-  virtual void onTreeExecutionCompleted(BT::NodeStatus status, bool was_cancelled)
-  {}
+  virtual std::optional<std::string> onTreeExecutionCompleted(BT::NodeStatus status,
+                                                              bool was_cancelled)
+  {
+    return std::nullopt;
+  }
 
   /**
    * @brief onLoopFeedback is a callback invoked at each loop, after tree.tickOnce().

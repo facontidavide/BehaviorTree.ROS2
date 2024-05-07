@@ -41,7 +41,8 @@ struct TreeExecutionServer::Pimpl
   BT::BehaviorTreeFactory factory;
   std::shared_ptr<BT::Groot2Publisher> groot_publisher;
 
-  std::string current_tree_name;
+  std::string tree_name;
+  std::string payload;
   std::shared_ptr<BT::Tree> tree;
   BT::Blackboard::Ptr global_blackboard;
   bool factory_initialized_ = false;
@@ -173,7 +174,8 @@ void TreeExecutionServer::execute(
 
     p_->tree = std::make_shared<BT::Tree>();
     *(p_->tree) = p_->factory.createTree(goal->target_tree, root_blackboard);
-    p_->current_tree_name = goal->target_tree;
+    p_->tree_name = goal->target_tree;
+    p_->payload = goal->payload;
 
     // call user defined function after the tree has been created
     onTreeCreated(*p_->tree);
@@ -191,10 +193,14 @@ void TreeExecutionServer::execute(
     auto stop_action = [this, &action_result](BT::NodeStatus status,
                                               const std::string& message) {
       action_result->node_status = ConvertNodeStatus(status);
-      action_result->error_message = message;
-      RCLCPP_WARN(kLogger, action_result->error_message.c_str());
+      action_result->return_message = message;
+      RCLCPP_WARN(kLogger, action_result->return_message.c_str());
       p_->tree->haltTree();
-      onTreeExecutionCompleted(status, true);
+      // override the message value if the user defined function returns it
+      if(auto msg = onTreeExecutionCompleted(status, true))
+      {
+        action_result->return_message = msg.value();
+      }
     };
 
     while(rclcpp::ok() && status == BT::NodeStatus::RUNNING)
@@ -219,7 +225,7 @@ void TreeExecutionServer::execute(
       if(const auto res = onLoopFeedback(); res.has_value())
       {
         auto feedback = std::make_shared<ExecuteTree::Feedback>();
-        feedback->msg = res.value();
+        feedback->message = res.value();
         goal_handle->publish_feedback(feedback);
       }
 
@@ -233,40 +239,38 @@ void TreeExecutionServer::execute(
   }
   catch(const std::exception& ex)
   {
-    action_result->error_message = std::string("Behavior Tree exception:") + ex.what();
-    RCLCPP_ERROR(kLogger, action_result->error_message.c_str());
+    action_result->return_message = std::string("Behavior Tree exception:") + ex.what();
+    RCLCPP_ERROR(kLogger, action_result->return_message.c_str());
     goal_handle->abort(action_result);
     return;
   }
 
-  // call user defined execution complete function
-  onTreeExecutionCompleted(status, false);
-
   // set the node_status result to the action
   action_result->node_status = ConvertNodeStatus(status);
 
+  // Call user defined onTreeExecutionCompleted function.
+  // Override the message value if the user defined function returns it
+  if(auto msg = onTreeExecutionCompleted(status, false))
+  {
+    action_result->return_message = msg.value();
+  }
+
   // return success or aborted for the action result
-  if(status == BT::NodeStatus::SUCCESS)
-  {
-    RCLCPP_INFO(kLogger, "BT finished with status: %s", BT::toStr(status).c_str());
-    goal_handle->succeed(action_result);
-  }
-  else
-  {
-    action_result->error_message = std::string("Behavior Tree failed during execution "
-                                               "with status: ") +
-                                   BT::toStr(status);
-    RCLCPP_ERROR(kLogger, action_result->error_message.c_str());
-    goal_handle->abort(action_result);
-  }
+  RCLCPP_INFO(kLogger, "BT finished with status: %s", BT::toStr(status).c_str());
+  goal_handle->succeed(action_result);
 }
 
-const std::string& TreeExecutionServer::currentTreeName() const
+const std::string& TreeExecutionServer::treeName() const
 {
-  return p_->current_tree_name;
+  return p_->tree_name;
 }
 
-BT::Tree* TreeExecutionServer::currentTree()
+const std::string& TreeExecutionServer::goalPayload() const
+{
+  return p_->payload;
+}
+
+BT::Tree* TreeExecutionServer::tree()
 {
   return p_->tree ? p_->tree.get() : nullptr;
 }
