@@ -66,8 +66,8 @@ public:
   /// @brief The payload received in the last goal
   const std::string& goalPayload() const;
 
-  /// @brief Tree being executed, nullptr if it doesn't exist, yet.
-  BT::Tree* tree();
+  /// @brief Tree being executed.
+  const BT::Tree& tree() const;
 
   /// @brief Pointer to the global blackboard
   BT::Blackboard::Ptr globalBlackboard();
