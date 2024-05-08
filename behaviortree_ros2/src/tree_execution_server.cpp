@@ -187,15 +187,18 @@ void TreeExecutionServer::execute(
     // cancel requested or by onLoopAfterTick()
     auto stop_action = [this, &action_result](BT::NodeStatus status,
                                               const std::string& message) {
-      action_result->node_status = ConvertNodeStatus(status);
-      action_result->return_message = message;
-      RCLCPP_WARN(kLogger, action_result->return_message.c_str());
       p_->tree.haltTree();
+      action_result->node_status = ConvertNodeStatus(status);
       // override the message value if the user defined function returns it
       if(auto msg = onTreeExecutionCompleted(status, true))
       {
         action_result->return_message = msg.value();
       }
+      else
+      {
+        action_result->return_message = message;
+      }
+      RCLCPP_WARN(kLogger, action_result->return_message.c_str());
     };
 
     while(rclcpp::ok() && status == BT::NodeStatus::RUNNING)
