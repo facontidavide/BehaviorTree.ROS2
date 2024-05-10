@@ -77,6 +77,15 @@ public:
 
 protected:
   /**
+   * @brief Callback invoked when a goal is received and before the tree is created.
+   * If it returns false, the goal will be rejected.
+  */
+  virtual bool onGoalReceived(const std::string& tree_name, const std::string& payload)
+  {
+    return true;
+  }
+
+  /**
    * @brief Callback invoked after the tree is created.
    * It can be used, for instance, to initialize a logger or the global blackboard.
    *

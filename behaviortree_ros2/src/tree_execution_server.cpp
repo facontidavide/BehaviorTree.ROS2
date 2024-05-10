@@ -121,6 +121,12 @@ TreeExecutionServer::handle_goal(const rclcpp_action::GoalUUID& /* uuid */,
 {
   RCLCPP_INFO(kLogger, "Received goal request to execute Behavior Tree: %s",
               goal->target_tree.c_str());
+
+  if(!onGoalReceived(goal->target_tree, goal->payload))
+  {
+    return rclcpp_action::GoalResponse::REJECT;
+  }
+
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
