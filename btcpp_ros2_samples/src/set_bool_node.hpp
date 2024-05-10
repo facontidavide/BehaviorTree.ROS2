@@ -27,11 +27,28 @@ public:
 
 //------------------------------------------------------
 
+// This is a workaround that can be used when we want to use SetBoolService,
+// but the service name has a namespace.
+// Therefore, instead of:
+//
+// <SetBool service_name="robotA/set_bool" value="true" />
+//
+// We can rewrite it as:
+//
+// <RobotSetBool robot="{robot_id}" command="true" />
+//
+// Registration in C++:
+//
+// factory.registerNodeType<RobotSetBool>("SetRobotBool", "set_bool", node);
+
 class NamespacedSetBool : public BT::ActionNodeBase
 {
 public:
   NamespacedSetBool(const std::string& name, const BT::NodeConfig& conf,
-                    const std::string& service_name, std::weak_ptr<rclcpp::Node> node);
+                    const BT::RosNodeParams& params);
+
+  NamespacedSetBool(const std::string& name, const BT::NodeConfig& conf,
+                    const std::string& service_name, rclcpp::Node::SharedPtr node);
 
   static BT::PortsList providedPorts()
   {

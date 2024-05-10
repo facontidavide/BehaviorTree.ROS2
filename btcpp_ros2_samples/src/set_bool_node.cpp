@@ -33,8 +33,24 @@ BT::NodeStatus SetBoolService::onFailure(BT::ServiceNodeErrorCode error)
 //------------------------------------------------------
 
 NamespacedSetBool::NamespacedSetBool(const std::string& name, const BT::NodeConfig& conf,
+                                     const BT::RosNodeParams& params)
+  : BT::ActionNodeBase(name, conf)
+  , local_bb_(BT::Blackboard::create(conf.blackboard))
+  , service_name_(params.default_port_value)
+{
+  BT::NodeConfig impl_config;
+  impl_config.blackboard = local_bb_;
+  impl_config.input_ports["service_name"] = "{=}";
+  impl_config.input_ports["value"] = "{=}";
+
+  BT::RosNodeParams impl_params = params;
+  impl_params.default_port_value = {};  // postpone this
+  set_bool_service_ = std::make_unique<SetBoolService>(name, impl_config, impl_params);
+}
+
+NamespacedSetBool::NamespacedSetBool(const std::string& name, const BT::NodeConfig& conf,
                                      const std::string& service_name,
-                                     std::weak_ptr<rclcpp::Node> node)
+                                     rclcpp::Node::SharedPtr node)
   : BT::ActionNodeBase(name, conf)
   , local_bb_(BT::Blackboard::create(conf.blackboard))
   , service_name_(service_name)
@@ -43,6 +59,7 @@ NamespacedSetBool::NamespacedSetBool(const std::string& name, const BT::NodeConf
   impl_config.blackboard = local_bb_;
   impl_config.input_ports["service_name"] = "{=}";
   impl_config.input_ports["value"] = "{=}";
+
   BT::RosNodeParams impl_params;
   impl_params.nh = node;
   set_bool_service_ = std::make_unique<SetBoolService>(name, impl_config, impl_params);
