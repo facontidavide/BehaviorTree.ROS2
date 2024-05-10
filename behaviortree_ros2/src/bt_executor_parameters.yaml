@@ -47,3 +47,9 @@ bt_server:
       unique<>: null,
     }
   }
+  tree_on_initialization: {
+    type: string,
+    default_value: "",
+    read_only: true,
+    description: "The name of the behavior tree to launch on intialization. Defaults to no behavior tree launched on initialization"
+  }

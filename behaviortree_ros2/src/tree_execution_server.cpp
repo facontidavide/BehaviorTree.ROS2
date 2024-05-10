@@ -33,6 +33,8 @@ struct TreeExecutionServer::Pimpl
   rclcpp_action::Server<ExecuteTree>::SharedPtr action_server;
   std::thread action_thread;
 
+  rclcpp_action::Client<ExecuteTree>::SharedPtr client_server;
+
   std::shared_ptr<bt_server::ParamListener> param_listener;
   bt_server::Params params;
 
@@ -71,6 +73,8 @@ TreeExecutionServer::TreeExecutionServer(const rclcpp::Node::SharedPtr& node)
         handle_accepted(std::move(goal_handle));
       });
 
+  p_->client_server = rclcpp_action::create_client<ExecuteTree>(node, action_name);
+
   // we use a wall timer to run asynchronously executeRegistration();
   rclcpp::VoidCallbackType callback = [this]() {
     if(!p_->factory_initialized_)
@@ -102,6 +106,16 @@ void TreeExecutionServer::executeRegistration()
   RegisterBehaviorTrees(p_->params, p_->factory, node_);
 
   p_->factory_initialized_ = true;
+
+  // launch initalization behavior tree if set
+  if(!p_->params.tree_on_initialization.empty())
+  {
+    auto goal_msg = ExecuteTree::Goal();
+    goal_msg.target_tree = p_->params.tree_on_initialization;
+
+    auto send_goal_options = rclcpp_action::Client<ExecuteTree>::SendGoalOptions();
+    p_->client_server->async_send_goal(goal_msg, send_goal_options);
+  }
 }
 
 rclcpp::node_interfaces::NodeBaseInterface::SharedPtr

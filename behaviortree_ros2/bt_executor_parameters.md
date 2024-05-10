@@ -72,3 +72,11 @@ List of 'package_name/subfolder' containing SubTrees to load into the BehaviorTr
 
 *Constraints:*
  - contains no duplicates
+
+## tree_on_initialization
+
+The name of the behavior tree to launch on intialization. Defaults to no behavior tree launched on initialization
+
+* Type: `string`
+* Default Value: ""
+* Read only: True
