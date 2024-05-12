@@ -73,7 +73,7 @@ TreeExecutionServer::TreeExecutionServer(const rclcpp::Node::SharedPtr& node)
         handle_accepted(std::move(goal_handle));
       });
 
-  p_->client_server = rclcpp_action::create_client<ExecuteTree>(node, action_name);
+  p_->client_server = rclcpp_action::create_client<ExecuteTree>(node_, action_name);
 
   // we use a wall timer to run asynchronously executeRegistration();
   rclcpp::VoidCallbackType callback = [this]() {
@@ -105,8 +105,6 @@ void TreeExecutionServer::executeRegistration()
   // load trees (XML) from multiple directories
   RegisterBehaviorTrees(p_->params, p_->factory, node_);
 
-  p_->factory_initialized_ = true;
-
   // launch initalization behavior tree if set
   if(!p_->params.tree_on_initialization.empty())
   {
@@ -116,6 +114,8 @@ void TreeExecutionServer::executeRegistration()
     auto send_goal_options = rclcpp_action::Client<ExecuteTree>::SendGoalOptions();
     p_->client_server->async_send_goal(goal_msg, send_goal_options);
   }
+
+  p_->factory_initialized_ = true;
 }
 
 rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
