@@ -25,6 +25,25 @@ namespace BT
 constexpr const char* ROS_PLUGIN_SYMBOL = "BT_RegisterRosNodeFromPlugin";
 }
 
+/* Use this macro to automatically register one or more custom Nodes
+*  into a factory that require access to the BT::RosNodeParams.
+*  For instance:
+*
+*   BT_REGISTER_ROS_NODES(factory, params)
+*   {
+*     factory.registerNodeType<SpecialNode>("SpecialNode", params);
+*   }
+*
+* IMPORTANT: this function MUST be declared in a cpp file, NOT a header file.
+* You must add the definition [BT_PLUGIN_EXPORT] in CMakeLists.txt using:
+*
+*   target_compile_definitions(my_plugin_target PRIVATE  BT_PLUGIN_EXPORT )
+*/
+
+#define BT_REGISTER_ROS_NODES(factory, params)                                           \
+  BTCPP_EXPORT void BT_RegisterRosNodeFromPlugin(BT::BehaviorTreeFactory& factory,       \
+                                                 const BT::RosNodeParams& params)
+
 // Use this macro to generate a plugin for:
 //
 // - BT::RosActionNode
