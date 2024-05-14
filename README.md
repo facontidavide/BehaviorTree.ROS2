@@ -33,6 +33,6 @@ wrap your Nodes into plugins that can be loaded at run-time.
 
 ## Acknowledgements
 
-A lot of code is either inspired or copied from [Nav2](https://navigation.ros.org/).
+A lot of code is either inspired or copied from [Nav2](https://docs.nav2.org/).
 
 For this reason, we retain the same license and copyright.
