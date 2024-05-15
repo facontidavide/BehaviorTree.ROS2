@@ -40,6 +40,13 @@ struct RosNodeParams
   std::chrono::milliseconds server_timeout = std::chrono::milliseconds(1000);
   // timeout used when detecting the server the first time
   std::chrono::milliseconds wait_for_server_timeout = std::chrono::milliseconds(500);
+
+  RosNodeParams() = default;
+  RosNodeParams(std::shared_ptr<rclcpp::Node> node) : nh(node)
+  {}
+  RosNodeParams(std::shared_ptr<rclcpp::Node> node, const std::string& port_name)
+    : nh(node), default_port_value(port_name)
+  {}
 };
 
 }  // namespace BT

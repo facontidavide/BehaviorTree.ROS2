@@ -108,8 +108,7 @@ public:
    */
   static PortsList providedBasicPorts(PortsList addition)
   {
-    PortsList basic = { InputPort<std::string>("action_name", "__default__placeholder__",
-                                               "Action server name") };
+    PortsList basic = { InputPort<std::string>("action_name", "", "Action server name") };
     basic.insert(addition.begin(), addition.end());
     return basic;
   }
@@ -164,9 +163,12 @@ public:
   void cancelGoal();
 
   /// The default halt() implementation will call cancelGoal if necessary.
-  void halt() override final;
+  void halt() override;
 
-  NodeStatus tick() override final;
+  NodeStatus tick() override;
+
+  /// Can be used to change the name of the action programmatically
+  void setActionName(const std::string& action_name);
 
 protected:
   struct ActionClientInstance
@@ -216,7 +218,7 @@ protected:
   std::weak_ptr<rclcpp::Node> node_;
   std::shared_ptr<ActionClientInstance> client_instance_;
   std::string action_name_;
-  bool action_name_may_change_ = false;
+  bool action_name_should_be_checked_ = false;
   const std::chrono::milliseconds server_timeout_;
   const std::chrono::milliseconds wait_for_server_timeout_;
   std::string action_client_key_;
@@ -265,44 +267,23 @@ inline RosActionNode<T>::RosActionNode(const std::string& instance_name,
   auto portIt = config().input_ports.find("action_name");
   if(portIt != config().input_ports.end())
   {
-    const std::string& bb_action_name = portIt->second;
+    const std::string& bb_service_name = portIt->second;
 
-    if(bb_action_name.empty() || bb_action_name == "__default__placeholder__")
+    if(isBlackboardPointer(bb_service_name))
     {
-      if(params.default_port_value.empty())
-      {
-        throw std::logic_error("Both [action_name] in the InputPort and the "
-                               "RosNodeParams are empty.");
-      }
-      else
-      {
-        createClient(params.default_port_value);
-      }
+      // unknown value at construction time. Postpone to tick
+      action_name_should_be_checked_ = true;
     }
-    else if(!isBlackboardPointer(bb_action_name))
+    else if(!bb_service_name.empty())
     {
-      // If the content of the port "action_name" is not
-      // a pointer to the blackboard, but a static string, we can
-      // create the client in the constructor.
-      createClient(bb_action_name);
-    }
-    else
-    {
-      action_name_may_change_ = true;
-      // createClient will be invoked in the first tick().
+      // "hard-coded" name in the bb_service_name. Use it.
+      createClient(bb_service_name);
     }
   }
-  else
+  // no port value or it is empty. Use the default value
+  if(!client_instance_ && !params.default_port_value.empty())
   {
-    if(params.default_port_value.empty())
-    {
-      throw std::logic_error("Both [action_name] in the InputPort and the RosNodeParams "
-                             "are empty.");
-    }
-    else
-    {
-      createClient(params.default_port_value);
-    }
+    createClient(params.default_port_value);
   }
 }
 
@@ -348,6 +329,13 @@ inline bool RosActionNode<T>::createClient(const std::string& action_name)
 }
 
 template <class T>
+inline void RosActionNode<T>::setActionName(const std::string& action_name)
+{
+  action_name_ = action_name;
+  createClient(action_name);
+}
+
+template <class T>
 inline NodeStatus RosActionNode<T>::tick()
 {
   if(!rclcpp::ok())
@@ -359,7 +347,8 @@ inline NodeStatus RosActionNode<T>::tick()
   // First, check if the action_client_ is valid and that the name of the
   // action_name in the port didn't change.
   // otherwise, create a new client
-  if(!client_instance_ || (status() == NodeStatus::IDLE && action_name_may_change_))
+  if(!client_instance_ ||
+     (status() == NodeStatus::IDLE && action_name_should_be_checked_))
   {
     std::string action_name;
     getInput("action_name", action_name);
@@ -368,6 +357,13 @@ inline NodeStatus RosActionNode<T>::tick()
       createClient(action_name);
     }
   }
+
+  if(!client_instance_)
+  {
+    throw BT::RuntimeError("RosActionNode: no client was specified neither as default or "
+                           "in the ports");
+  }
+
   auto& action_client = client_instance_->action_client;
 
   //------------------------------------------

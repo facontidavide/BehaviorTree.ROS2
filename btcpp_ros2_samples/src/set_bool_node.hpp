@@ -8,8 +8,8 @@ using SetBool = std_srvs::srv::SetBool;
 class SetBoolService : public BT::RosServiceNode<SetBool>
 {
 public:
-  SetBoolService(const std::string& name, const BT::NodeConfig& conf,
-                 const BT::RosNodeParams& params)
+  explicit SetBoolService(const std::string& name, const BT::NodeConfig& conf,
+                          const BT::RosNodeParams& params)
     : RosServiceNode<SetBool>(name, conf, params)
   {}
 
@@ -23,47 +23,29 @@ public:
   BT::NodeStatus onResponseReceived(const Response::SharedPtr& response) override;
 
   virtual BT::NodeStatus onFailure(BT::ServiceNodeErrorCode error) override;
+
+private:
+  std::string service_suffix_;
 };
 
-//------------------------------------------------------
+//----------------------------------------------
 
-// This is a workaround that can be used when we want to use SetBoolService,
-// but the service name has a namespace.
-// Therefore, instead of:
-//
-// <SetBool service_name="robotA/set_bool" value="true" />
-//
-// We can rewrite it as:
-//
-// <RobotSetBool robot="{robot_id}" command="true" />
-//
-// Registration in C++:
-//
-// factory.registerNodeType<RobotSetBool>("SetRobotBool", "set_bool", node);
-
-class NamespacedSetBool : public BT::ActionNodeBase
+class SetRobotBoolService : public SetBoolService
 {
 public:
-  NamespacedSetBool(const std::string& name, const BT::NodeConfig& conf,
-                    const BT::RosNodeParams& params);
-
-  NamespacedSetBool(const std::string& name, const BT::NodeConfig& conf,
-                    const std::string& service_name, rclcpp::Node::SharedPtr node);
+  explicit SetRobotBoolService(const std::string& name, const BT::NodeConfig& conf,
+                               const rclcpp::Node::SharedPtr& node,
+                               const std::string& port_name)
+    : SetBoolService(name, conf, BT::RosNodeParams(node)), service_suffix_(port_name)
+  {}
 
   static BT::PortsList providedPorts()
   {
-    return { BT::InputPort<std::string>("robot"), BT::InputPort<bool>("command") };
+    return { BT::InputPort<std::string>("robot"), BT::InputPort<bool>("value") };
   }
 
   BT::NodeStatus tick() override;
 
-  void halt() override
-  {
-    set_bool_service_->halt();
-  }
-
 private:
-  BT::Blackboard::Ptr local_bb_;
-  std::string service_name_;
-  std::unique_ptr<SetBoolService> set_bool_service_;
+  std::string service_suffix_;
 };

@@ -10,8 +10,11 @@ static const char* xml_text = R"(
  <root BTCPP_format="4">
      <BehaviorTree>
         <Sequence>
-            <RobotSetBool robot="robotA" command="true"/>
-            <RobotSetBool robot="robotB" command="true"/>
+
+            <SetBoolA value="true"/>
+            <SetBool  service_name="robotB/set_bool" value="true"/>
+            <SetRobotBool robot="robotA" value="true"/>
+            <SetRobotBool robot="robotB" value="true"/>
         </Sequence>
      </BehaviorTree>
  </root>
@@ -23,7 +26,16 @@ int main(int argc, char** argv)
   auto nh = std::make_shared<rclcpp::Node>("bool_client");
 
   BehaviorTreeFactory factory;
-  factory.registerNodeType<NamespacedSetBool>("RobotSetBool", "set_bool", nh);
+
+  // version with default port
+  factory.registerNodeType<SetBoolService>("SetBoolA", BT::RosNodeParams(nh, "robotA/"
+                                                                             "set_bool"));
+
+  // version without default port
+  factory.registerNodeType<SetBoolService>("SetBool", BT::RosNodeParams(nh));
+
+  // namespace version
+  factory.registerNodeType<SetRobotBoolService>("SetRobotBool", nh, "set_bool");
 
   auto tree = factory.createTreeFromText(xml_text);
 

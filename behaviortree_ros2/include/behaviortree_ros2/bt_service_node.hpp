@@ -96,8 +96,7 @@ public:
    */
   static PortsList providedBasicPorts(PortsList addition)
   {
-    PortsList basic = { InputPort<std::string>("service_name", "__default__placeholder__",
-                                               "Service name") };
+    PortsList basic = { InputPort<std::string>("service_name", "", "Service name") };
     basic.insert(addition.begin(), addition.end());
     return basic;
   }
@@ -111,7 +110,7 @@ public:
     return providedBasicPorts({});
   }
 
-  NodeStatus tick() override final;
+  NodeStatus tick() override;
 
   /// The default halt() implementation.
   void halt() override;
@@ -157,6 +156,9 @@ protected:
     return action_client_mutex;
   }
 
+  // method to set the service name programmatically
+  void setServiceName(const std::string& service_name);
+
   rclcpp::Logger logger()
   {
     if(auto node = node_.lock())
@@ -186,7 +188,7 @@ protected:
 
   std::weak_ptr<rclcpp::Node> node_;
   std::string service_name_;
-  bool service_name_may_change_ = false;
+  bool service_name_should_be_checked_ = false;
   const std::chrono::milliseconds service_timeout_;
   const std::chrono::milliseconds wait_for_service_timeout_;
 
@@ -233,51 +235,30 @@ inline RosServiceNode<T>::RosServiceNode(const std::string& instance_name,
   {
     const std::string& bb_service_name = portIt->second;
 
-    if(bb_service_name.empty() || bb_service_name == "__default__placeholder__")
+    if(isBlackboardPointer(bb_service_name))
     {
-      if(params.default_port_value.empty())
-      {
-        throw std::logic_error("Both [service_name] in the InputPort and the "
-                               "RosNodeParams are empty.");
-      }
-      else
-      {
-        createClient(params.default_port_value);
-      }
+      // unknown value at construction time. postpone to tick
+      service_name_should_be_checked_ = true;
     }
-    else if(!isBlackboardPointer(bb_service_name))
+    else if(!bb_service_name.empty())
     {
-      // If the content of the port "service_name" is not
-      // a pointer to the blackboard, but a static string, we can
-      // create the client in the constructor.
+      // "hard-coded" name in the bb_service_name. Use it.
       createClient(bb_service_name);
     }
-    else
-    {
-      service_name_may_change_ = true;
-      // createClient will be invoked in the first tick().
-    }
   }
-  else
+  // no port value or it is empty. Use the default port value
+  if(!srv_instance_ && !params.default_port_value.empty())
   {
-    if(params.default_port_value.empty())
-    {
-      throw std::logic_error("Both [service_name] in the InputPort and the RosNodeParams "
-                             "are empty.");
-    }
-    else
-    {
-      createClient(params.default_port_value);
-    }
+    createClient(params.default_port_value);
   }
 }
 
 template <class T>
 inline bool RosServiceNode<T>::createClient(const std::string& service_name)
 {
-  if(service_name.empty())
+  if(service_name.empty() || service_name == "__default__placeholder__")
   {
-    throw RuntimeError("service_name is empty");
+    throw RuntimeError("service_name is empty or invalid");
   }
 
   std::unique_lock lk(getMutex());
@@ -315,6 +296,13 @@ inline bool RosServiceNode<T>::createClient(const std::string& service_name)
 }
 
 template <class T>
+inline void RosServiceNode<T>::setServiceName(const std::string& service_name)
+{
+  service_name_ = service_name;
+  createClient(service_name);
+}
+
+template <class T>
 inline NodeStatus RosServiceNode<T>::tick()
 {
   if(!rclcpp::ok())
@@ -326,7 +314,7 @@ inline NodeStatus RosServiceNode<T>::tick()
   // First, check if the service_client is valid and that the name of the
   // service_name in the port didn't change.
   // otherwise, create a new client
-  if(!srv_instance_ || (status() == NodeStatus::IDLE && service_name_may_change_))
+  if(!srv_instance_ || (status() == NodeStatus::IDLE && service_name_should_be_checked_))
   {
     std::string service_name;
     getInput("service_name", service_name);
@@ -334,6 +322,12 @@ inline NodeStatus RosServiceNode<T>::tick()
     {
       createClient(service_name);
     }
+  }
+
+  if(!srv_instance_)
+  {
+    throw BT::RuntimeError("RosServiceNode: no service client was specified neither as "
+                           "default or in the ports");
   }
 
   auto CheckStatus = [](NodeStatus status) {
