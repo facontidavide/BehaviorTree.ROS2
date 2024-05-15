@@ -126,7 +126,6 @@ TreeExecutionServer::handle_goal(const rclcpp_action::GoalUUID& /* uuid */,
   {
     return rclcpp_action::GoalResponse::REJECT;
   }
-
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
