@@ -399,6 +399,7 @@ inline NodeStatus RosActionNode<T>::tick()
     goal_options.feedback_callback =
         [this](typename GoalHandle::SharedPtr,
                const std::shared_ptr<const Feedback> feedback) {
+          std::unique_lock<std::mutex> lock(getMutex());
           on_feedback_state_change_ = onFeedback(feedback);
           if(on_feedback_state_change_ == NodeStatus::IDLE)
           {
@@ -408,6 +409,7 @@ inline NodeStatus RosActionNode<T>::tick()
         };
     //--------------------
     goal_options.result_callback = [this](const WrappedResult& result) {
+      std::unique_lock<std::mutex> lock(getMutex());
       if(goal_handle_->get_goal_id() == result.goal_id)
       {
         RCLCPP_DEBUG(logger(), "result_callback");
@@ -417,8 +419,10 @@ inline NodeStatus RosActionNode<T>::tick()
     };
     //--------------------
     goal_options.goal_response_callback =
-        [this](typename GoalHandle::SharedPtr const future_handle) {
-          auto goal_handle_ = future_handle.get();
+        [this](typename GoalHandle::SharedPtr const handle) {
+          std::unique_lock<std::mutex> lock(getMutex());
+          goal_received_ = true;
+          goal_handle_ = handle;
           if(!goal_handle_)
           {
             RCLCPP_ERROR(logger(), "Goal was rejected by server");
@@ -443,49 +447,37 @@ inline NodeStatus RosActionNode<T>::tick()
 
   if(status() == NodeStatus::RUNNING)
   {
-    std::unique_lock<std::mutex> lock(getMutex());
     client_instance_->callback_executor.spin_some();
+    std::unique_lock<std::mutex> lock(getMutex());
 
     // FIRST case: check if the goal request has a timeout
     if(!goal_received_)
     {
-      auto nodelay = std::chrono::milliseconds(0);
-      auto timeout =
+      const auto timeout =
           rclcpp::Duration::from_seconds(double(server_timeout_.count()) / 1000);
 
-      auto ret = client_instance_->callback_executor.spin_until_future_complete(
-          future_goal_handle_, nodelay);
-      if(ret != rclcpp::FutureReturnCode::SUCCESS)
+      if((now() - time_goal_sent_) > timeout)
       {
-        if((now() - time_goal_sent_) > timeout)
-        {
-          return CheckStatus(onFailure(SEND_GOAL_TIMEOUT));
-        }
-        else
-        {
-          return NodeStatus::RUNNING;
-        }
+        return CheckStatus(onFailure(SEND_GOAL_TIMEOUT));
       }
       else
       {
-        goal_received_ = true;
-        goal_handle_ = future_goal_handle_.get();
-        future_goal_handle_ = {};
-
-        if(!goal_handle_)
-        {
-          return CheckStatus(onFailure(GOAL_REJECTED_BY_SERVER));
-        }
+        return NodeStatus::RUNNING;
       }
     }
+    // SECOND case: goal received but rejected by the server
+    if(goal_received_ && !goal_handle_)
+    {
+      return CheckStatus(onFailure(GOAL_REJECTED_BY_SERVER));
+    }
 
-    // SECOND case: onFeedback requested a stop
+    // THIRD case: onFeedback requested a stop
     if(on_feedback_state_change_ != NodeStatus::RUNNING)
     {
       cancelGoal();
       return on_feedback_state_change_;
     }
-    // THIRD case: result received, requested a stop
+    // FOURTH case: result received, requested a stop
     if(result_.code != rclcpp_action::ResultCode::UNKNOWN)
     {
       if(result_.code == rclcpp_action::ResultCode::ABORTED)
@@ -519,13 +511,15 @@ template <class T>
 inline void RosActionNode<T>::cancelGoal()
 {
   auto& executor = client_instance_->callback_executor;
+  executor.spin_some();
+
   if(!goal_handle_)
   {
     if(future_goal_handle_.valid())
     {
-      // Here the discussion is if we should block or put a timer for the waiting
-      auto ret =
-          executor.spin_until_future_complete(future_goal_handle_, server_timeout_);
+      int ms_passed = int((now() - time_goal_sent_).seconds() / 1000);
+      auto wait_time = server_timeout_ - std::chrono::milliseconds(ms_passed);
+      auto ret = executor.spin_until_future_complete(future_goal_handle_, wait_time);
       if(ret != rclcpp::FutureReturnCode::SUCCESS)
       {
         // In that case the goal was not accepted or timed out so probably we should do nothing.
