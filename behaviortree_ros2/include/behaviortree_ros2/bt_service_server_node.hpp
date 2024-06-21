@@ -101,25 +101,7 @@ protected:
   // method to set the service name programmatically
   void setServiceName(const std::string& service_name);
 
-  rclcpp::Logger logger()
-  {
-    if(auto node = node_.lock())
-    {
-      return node->get_logger();
-    }
-    return rclcpp::get_logger("RosServiceServerNode");
-  }
-
-  rclcpp::Time now()
-  {
-    if(auto node = node_.lock())
-    {
-      return node->now();
-    }
-    return rclcpp::Clock(RCL_ROS_TIME).now();
-  }
-
-  std::weak_ptr<rclcpp::Node> node_;
+  std::shared_ptr<rclcpp::Node> node_;
   std::string service_name_;
   bool service_name_should_be_checked_ = false;
 
@@ -142,8 +124,9 @@ inline RosServiceServerNode<T>::RosServiceServerNode(const std::string& instance
   : BT::ConditionNode(instance_name, conf)
   , node_(params.nh)
   , callback_group_(node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false))
-  , callback_executor_.add_callback_group(callback_group_, node_->get_node_base_interface())
 {
+  callback_executor_.add_callback_group(callback_group_, node_->get_node_base_interface());
+
   // check port remapping
   auto portIt = config().input_ports.find("service_name");
   if(portIt != config().input_ports.end())
@@ -162,7 +145,7 @@ inline RosServiceServerNode<T>::RosServiceServerNode(const std::string& instance
     }
   }
   // no port value or it is empty. Use the default port value
-  if(!srv_instance_ && !params.default_port_value.empty())
+  if(!params.default_port_value.empty())
   {
     createService(params.default_port_value);
   }
@@ -176,15 +159,7 @@ inline bool RosServiceServerNode<T>::createService(const std::string& service_na
     throw RuntimeError("service_name is empty or invalid");
   }
 
-  std::unique_lock lk(getMutex());
-  auto node = node_.lock();
-  if(!node)
-  {
-    throw RuntimeError("The ROS node went out of scope. RosNodeParams doesn't take the "
-                       "ownership of the node.");
-  }
-
-  service_ = node->create_service<ServiceT>(
+  service_ = node_->create_service<T>(
       service_name,
       [this](const typename Request::SharedPtr request,
              typename Response::SharedPtr response) -> void {
@@ -192,7 +167,7 @@ inline bool RosServiceServerNode<T>::createService(const std::string& service_na
       },
       rmw_qos_profile_services_default,
       callback_group_);
-  RCLCPP_INFO(logger(), "Node [%s] created service client [%s]", name().c_str(),
+  RCLCPP_INFO(node_->get_logger(), "Node [%s] created service client [%s]", name().c_str(),
               service_name.c_str());
   service_name_ = service_name;
 }
