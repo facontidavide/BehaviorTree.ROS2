@@ -123,8 +123,8 @@ inline RosServiceServerNode<T>::RosServiceServerNode(const std::string& instance
                                                      const RosNodeParams& params)
   : BT::ConditionNode(instance_name, conf)
   , node_(params.nh)
-  , callback_group_(node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false))
 {
+  callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false);
   callback_executor_.add_callback_group(callback_group_, node_->get_node_base_interface());
 
   // check port remapping
@@ -167,7 +167,7 @@ inline bool RosServiceServerNode<T>::createService(const std::string& service_na
       },
       rmw_qos_profile_services_default,
       callback_group_);
-  RCLCPP_INFO(node_->get_logger(), "Node [%s] created service client [%s]", name().c_str(),
+  RCLCPP_INFO(node_->get_logger(), "Node [%s] created service server [%s]", name().c_str(),
               service_name.c_str());
   service_name_ = service_name;
   return true;
