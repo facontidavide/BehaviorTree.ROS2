@@ -170,6 +170,7 @@ inline bool RosServiceServerNode<T>::createService(const std::string& service_na
   RCLCPP_INFO(node_->get_logger(), "Node [%s] created service client [%s]", name().c_str(),
               service_name.c_str());
   service_name_ = service_name;
+  return true;
 }
 
 template <class T>
