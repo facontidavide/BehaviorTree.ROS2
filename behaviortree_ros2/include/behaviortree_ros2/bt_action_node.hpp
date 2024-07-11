@@ -364,7 +364,7 @@ inline NodeStatus RosActionNode<T>::tick()
 
   if(!client_instance_)
   {
-    throw BT::RuntimeError("RosActionNode: no client was specified neither as default or "
+    throw BT::RuntimeError("RosActionNode: no client was specified, neither as default nor "
                            "in the ports");
   }
 
