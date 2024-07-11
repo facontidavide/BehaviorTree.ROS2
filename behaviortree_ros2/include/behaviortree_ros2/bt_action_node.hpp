@@ -103,6 +103,10 @@ public:
    * @brief Any subclass of RosActionNode that has ports must implement a
    * providedPorts method and call providedBasicPorts in it.
    *
+   * The basic ports:
+   *
+   * - `action_name` Action server name
+   *
    * @param addition Additional ports to add to BT port list
    * @return PortsList containing basic ports along with node-specific ports
    */
