@@ -216,7 +216,7 @@ inline RosServiceNode<T>::ServiceClientInstance::ServiceClientInstance(
       node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false);
   callback_executor.add_callback_group(callback_group, node->get_node_base_interface());
 
-  service_client = node->create_client<T>(service_name, rmw_qos_profile_services_default,
+  service_client = node->create_client<T>(service_name, rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_services_default)),
                                           callback_group);
 }
 

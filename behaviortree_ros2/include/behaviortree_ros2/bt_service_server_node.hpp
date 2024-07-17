@@ -165,7 +165,7 @@ inline bool RosServiceServerNode<T>::createService(const std::string& service_na
              typename Response::SharedPtr response) -> void {
         serviceCallback(request, response);
       },
-      rmw_qos_profile_services_default,
+      rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_services_default)),
       callback_group_);
   RCLCPP_INFO(node_->get_logger(), "Node [%s] created service server [%s]", name().c_str(),
               service_name.c_str());
