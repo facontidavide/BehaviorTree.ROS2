@@ -18,7 +18,7 @@ Furthermore, the user can customize it to:
 
 - Register custom BT Nodes directly (static linking).
 - Attach additional loggers. The **Groot2** publisher will be attached by default.
-- Use the "global blackboard", a new idiom/pattern explained in [this tutorial](https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/examples/t19_global_blackboard.cpp).
+- Use the "global blackboard", a new idiom/pattern explained in [this tutorial](https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/examples/t16_global_blackboard.cpp).
 - Customize the feedback of the `rclcpp_action::Server`.
 
 ## Customization points

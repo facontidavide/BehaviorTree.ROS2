@@ -11,7 +11,14 @@
 // COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4244)
 #include <thread>
+#pragma warning(pop)
+#else
+#include <thread>
+#endif
 
 #include "behaviortree_ros2/tree_execution_server.hpp"
 #include "behaviortree_ros2/bt_utils.hpp"
@@ -235,7 +242,8 @@ void TreeExecutionServer::execute(
       const auto now = std::chrono::steady_clock::now();
       if(now < loop_deadline)
       {
-        p_->tree.sleep(loop_deadline - now);
+        p_->tree.sleep(std::chrono::duration_cast<std::chrono::system_clock::duration>(
+            loop_deadline - now));
       }
       loop_deadline += period;
     }
