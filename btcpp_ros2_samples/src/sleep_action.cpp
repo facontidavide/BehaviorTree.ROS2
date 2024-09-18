@@ -24,7 +24,7 @@ NodeStatus SleepAction::onFailure(ActionNodeErrorCode error)
 
 BT::NodeStatus SleepAction::onFeedback(const std::shared_ptr<const Feedback> feedback)
 {
-  RCLCPP_INFO_THROTTLE(logger(), *get_clock(), 1000, "Feedback cycle %d", feedback->cycle);
+  RCLCPP_INFO_THROTTLE(logger(), *clock(), 1000, "Feedback cycle %d", feedback->cycle);
   return NodeStatus::RUNNING;
 }
 

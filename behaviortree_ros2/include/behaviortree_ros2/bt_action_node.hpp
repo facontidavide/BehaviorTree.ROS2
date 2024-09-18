@@ -206,13 +206,14 @@ protected:
     return rclcpp::Clock(RCL_ROS_TIME).now();
   }
 
-  rclcpp::Clock::SharedPtr get_clock()
+  rclcpp::Clock::SharedPtr clock()
   {
     if(auto node = node_.lock())
     {
       return node->get_clock();
     }
-    return std::make_shared<rclcpp::Clock>(RCL_ROS_TIME);
+    static auto clock = std::make_shared<rclcpp::Clock>(RCL_ROS_TIME);
+    return clock;
   }
 
   using ClientsRegistry =
