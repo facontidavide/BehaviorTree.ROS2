@@ -223,9 +223,6 @@ inline bool RosTopicSubNode<T>::createSubscriber(const std::string& topic_name)
     throw RuntimeError("Can't call createSubscriber more than once");
   }
 
-  // find SubscriberInstance in the registry
-  std::unique_lock lk(registryMutex());
-
   auto node = node_.lock();
   if(!node)
   {
@@ -236,10 +233,10 @@ inline bool RosTopicSubNode<T>::createSubscriber(const std::string& topic_name)
   const auto publisher_info = node->get_publishers_info_by_topic(topic_name);
   if(publisher_info.empty())
   {
-    RCLCPP_INFO_ONCE(logger(),
-                     "No publisher found on topic [%s]. Deferring creation of subscriber "
-                     "until publisher exists.",
-                     topic_name_.c_str());
+    RCLCPP_INFO(logger(),
+                "No publisher found on topic [%s]. Deferring creation of subscriber "
+                "until publisher exists.",
+                topic_name_.c_str());
     return false;
   }
 
@@ -260,6 +257,9 @@ inline bool RosTopicSubNode<T>::createSubscriber(const std::string& topic_name)
   }
 
   subscriber_key_ = std::string(node->get_fully_qualified_name()) + "/" + topic_name;
+
+  // find SubscriberInstance in the registry
+  std::unique_lock lk(registryMutex());
 
   auto& registry = getRegistry();
   auto it = registry.find(subscriber_key_);
@@ -317,12 +317,16 @@ inline NodeStatus RosTopicSubNode<T>::onStart()
     return NodeStatus::RUNNING;
   }
 
-  // Check to see if the subscriber has received a message since we initially created it.
-  // NOTE(schornakj): The subscriber needs to be spun twice to receive a published message if it had
-  // never been spun before the message was published. I think the first spin_once handles the discovery
-  // interaction between the publisher and subscriber, and the second spin_once actually transmits the message.
-  // Therefore, this BT node will never receive a published message on the first tick.
-  // This might depend on the ROS middleware implementation.
+  // NOTE(schornakj): rclcpp's spin_some function handles all queued work on the executor.
+  // However, the discovery interaction between the publisher and subscriber is also handled through
+  // this queue, and the process of receiving a published message is added to the queue only after
+  // the publisher and subscriber are connected.
+  // This means we need to call spin_some twice to ensure all possible communication is handled between
+  // our subscriber and a publisher. It's important to do this to avoid failure to receive messages
+  // in situations where the publisher has both appeared and sent a message in between ticks.
+  // This behavior might depend on the ROS middleware implementation.
+
+  sub_instance_->callback_group_executor.spin_some();
   sub_instance_->callback_group_executor.spin_some();
 
   // If no message was received, return RUNNING
@@ -350,7 +354,7 @@ inline NodeStatus RosTopicSubNode<T>::onRunning()
     }
   }
 
-  // Spin the subscriber to process any new message that has been received since the last tick
+  sub_instance_->callback_group_executor.spin_some();
   sub_instance_->callback_group_executor.spin_some();
 
   // If no message was received, return RUNNING

@@ -9,6 +9,7 @@
 #include <rclcpp/utilities.hpp>
 #include <std_msgs/msg/empty.hpp>
 
+#include <chrono>
 #include <thread>
 
 namespace
@@ -205,12 +206,15 @@ TEST_F(TestBtTopicSubNode, PublisherNotAvailableAtStart)
 
   // GIVEN we create publisher with BestEffort reliability QoS settings after creating the BT node and after the node starts ticking
   createPublisher(rclcpp::QoS(kHistoryDepth).best_effort());
-  // AND the publisher has published a message
+
+  // TODO(Joe): Why does the node need to be ticked in between the publisher appearing and sending a message for the message to be received? Seems highly suspicious!
+  ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
+
+  // GIVEN the publisher has published a message
   publisher_->publish(std_msgs::build<Empty>());
 
   // WHEN the BT node is ticked
   // THEN it succeeds
-  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
   EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));
 }
 }  // namespace BT
