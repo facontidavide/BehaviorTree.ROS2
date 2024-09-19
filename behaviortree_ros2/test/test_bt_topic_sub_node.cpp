@@ -99,7 +99,8 @@ TEST_F(TestBtTopicSubNode, TopicAsParam)
   // GIVEN we create publisher with default QoS settings after creating the BT node
   createPublisher(rclcpp::QoS(kHistoryDepth));
 
-  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
+  // GIVEN the BT node is RUNNING before the publisher publishes a message
+  ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
 
   // GIVEN the publisher has published a message
   publisher_->publish(std_msgs::build<Empty>());
@@ -124,7 +125,8 @@ TEST_F(TestBtTopicSubNode, TopicFromStaticStringInPort)
   // GIVEN we create publisher with default QoS settings after creating the BT node
   createPublisher(rclcpp::QoS(kHistoryDepth));
 
-  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
+  // GIVEN the BT node is RUNNING before the publisher publishes a message
+  ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
 
   // GIVEN the publisher has published a message
   publisher_->publish(std_msgs::build<Empty>());
@@ -149,7 +151,8 @@ TEST_F(TestBtTopicSubNode, TopicFromBlackboard)
   // GIVEN we create publisher with default QoS settings after creating the BT node
   createPublisher(rclcpp::QoS(kHistoryDepth));
 
-  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
+  // GIVEN the BT node is RUNNING before the publisher publishes a message
+  ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
 
   // GIVEN the publisher has published a message
   publisher_->publish(std_msgs::build<Empty>());
@@ -159,7 +162,7 @@ TEST_F(TestBtTopicSubNode, TopicFromBlackboard)
   EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));
 }
 
-TEST_F(TestBtTopicSubNode, TopicAsParamQoSBestEffort)
+TEST_F(TestBtTopicSubNode, QoSBestEffort)
 {
   // GIVEN the blackboard does not contain the topic name
 
@@ -174,13 +177,40 @@ TEST_F(TestBtTopicSubNode, TopicAsParamQoSBestEffort)
   // GIVEN we create publisher with BestEffort reliability QoS settings after creating the BT node
   createPublisher(rclcpp::QoS(kHistoryDepth).best_effort());
 
-  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
+  // GIVEN the BT node is RUNNING before the publisher publishes a message
+  ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
 
   // GIVEN the publisher has published a message
   publisher_->publish(std_msgs::build<Empty>());
 
   // WHEN the BT node is ticked
   // THEN it succeeds
+  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));
+}
+
+TEST_F(TestBtTopicSubNode, PublisherNotAvailableAtStart)
+{
+  // GIVEN the blackboard does not contain the topic name
+
+  // GIVEN the input params contain the topic name
+  RosNodeParams params;
+  params.nh = node_;
+  params.default_port_value = kTopicName;
+
+  // GIVEN we pass in the params and the blackboard when creating the BT node
+  SubNode bt_node("test_node", config_, params);
+
+  // GIVEN the BT node is RUNNING before the publisher is created
+  ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
+
+  // GIVEN we create publisher with BestEffort reliability QoS settings after creating the BT node and after the node starts ticking
+  createPublisher(rclcpp::QoS(kHistoryDepth).best_effort());
+  // AND the publisher has published a message
+  publisher_->publish(std_msgs::build<Empty>());
+
+  // WHEN the BT node is ticked
+  // THEN it succeeds
+  EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
   EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));
 }
 }  // namespace BT

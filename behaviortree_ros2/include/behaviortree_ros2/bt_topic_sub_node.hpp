@@ -17,6 +17,8 @@
 #include <behaviortree_cpp/action_node.h>
 #include <behaviortree_cpp/basic_types.h>
 #include <memory>
+#include <rclcpp/logging.hpp>
+#include <rclcpp/qos.hpp>
 #include <string>
 #include <rclcpp/executors.hpp>
 #include <rclcpp/allocator/allocator_common.hpp>
@@ -51,7 +53,9 @@ public:
 protected:
   struct SubscriberInstance
   {
-    SubscriberInstance(std::shared_ptr<rclcpp::Node> node, const std::string& topic_name);
+    SubscriberInstance(std::shared_ptr<rclcpp::Node> node, const std::string& topic_name,
+                       const std::size_t history_depth,
+                       const rclcpp::ReliabilityPolicy& reliability);
 
     std::shared_ptr<Subscriber> subscriber;
     rclcpp::CallbackGroup::SharedPtr callback_group;
@@ -170,7 +174,8 @@ private:
 //----------------------------------------------------------------
 template <class T>
 inline RosTopicSubNode<T>::SubscriberInstance::SubscriberInstance(
-    std::shared_ptr<rclcpp::Node> node, const std::string& topic_name)
+    std::shared_ptr<rclcpp::Node> node, const std::string& topic_name,
+    const std::size_t history_depth, const rclcpp::ReliabilityPolicy& reliability)
 {
   // create a callback group for this particular instance
   callback_group =
@@ -186,7 +191,8 @@ inline RosTopicSubNode<T>::SubscriberInstance::SubscriberInstance(
     last_msg = msg;
     broadcaster(msg);
   };
-  subscriber = node->create_subscription<T>(topic_name, 1, callback, option);
+  subscriber = node->create_subscription<T>(
+      topic_name, rclcpp::QoS(history_depth).reliability(reliability), callback, option);
 }
 
 template <class T>
@@ -201,7 +207,8 @@ inline RosTopicSubNode<T>::RosTopicSubNode(const std::string& instance_name,
     topic_name_ = params.default_port_value;
   }
 
-  // If no value was provided through the params, assume that the topic name will be set through a port when the node is first ticked.
+  // If no value was provided through the params, assume that the topic name will be set
+  // through a port when the node is first ticked.
 }
 
 template <class T>
@@ -225,13 +232,41 @@ inline bool RosTopicSubNode<T>::createSubscriber(const std::string& topic_name)
     throw RuntimeError("The ROS node went out of scope. RosNodeParams doesn't take the "
                        "ownership of the node.");
   }
+
+  const auto publisher_info = node->get_publishers_info_by_topic(topic_name);
+  if(publisher_info.empty())
+  {
+    RCLCPP_INFO_ONCE(logger(),
+                     "No publisher found on topic [%s]. Deferring creation of subscriber "
+                     "until publisher exists.",
+                     topic_name_.c_str());
+    return false;
+  }
+
+  rclcpp::ReliabilityPolicy publisher_reliability =
+      publisher_info.at(0).qos_profile().reliability();
+  for(std::size_t i = 1; i < publisher_info.size(); i++)
+  {
+    if(publisher_reliability != publisher_info.at(i).qos_profile().reliability())
+    {
+      RCLCPP_WARN_ONCE(logger(),
+                       "Multiple publishers were found on topic [%s] with different QoS "
+                       "reliability policies. The subscriber will use the reliability "
+                       "setting from the first publisher it found, but this may result "
+                       "in undesirable behavior.",
+                       topic_name_.c_str());
+      break;
+    }
+  }
+
   subscriber_key_ = std::string(node->get_fully_qualified_name()) + "/" + topic_name;
 
   auto& registry = getRegistry();
   auto it = registry.find(subscriber_key_);
   if(it == registry.end() || it->second.expired())
   {
-    sub_instance_ = std::make_shared<SubscriberInstance>(node, topic_name);
+    sub_instance_ =
+        std::make_shared<SubscriberInstance>(node, topic_name, 1, publisher_reliability);
     registry.insert({ subscriber_key_, sub_instance_ });
 
     RCLCPP_INFO(logger(), "Node [%s] created Subscriber to topic [%s]", name().c_str(),
@@ -268,7 +303,8 @@ inline NodeStatus RosTopicSubNode<T>::checkStatus(const NodeStatus& status) cons
 template <class T>
 inline NodeStatus RosTopicSubNode<T>::onStart()
 {
-  // If the topic name was provided through an input port, is a valid topic name, and is different from the stored topic name, update the stored topic name to the new string.
+  // If the topic name was provided through an input port, is a valid topic name, and is different
+  // from the stored topic name, update the stored topic name to the new string.
   if(const auto topic_name = getInput<std::string>("topic_name");
      topic_name.has_value() && !topic_name->empty() &&
      topic_name.value() != "__default__placeholder__" && topic_name != topic_name_)
@@ -276,9 +312,17 @@ inline NodeStatus RosTopicSubNode<T>::onStart()
     topic_name_ = topic_name.value();
   }
 
-  createSubscriber(topic_name_);
+  if(!createSubscriber(topic_name_))
+  {
+    return NodeStatus::RUNNING;
+  }
 
   // Check to see if the subscriber has received a message since we initially created it.
+  // NOTE(schornakj): The subscriber needs to be spun twice to receive a published message if it had
+  // never been spun before the message was published. I think the first spin_once handles the discovery
+  // interaction between the publisher and subscriber, and the second spin_once actually transmits the message.
+  // Therefore, this BT node will never receive a published message on the first tick.
+  // This might depend on the ROS middleware implementation.
   sub_instance_->callback_group_executor.spin_some();
 
   // If no message was received, return RUNNING
@@ -298,6 +342,14 @@ inline NodeStatus RosTopicSubNode<T>::onStart()
 template <class T>
 inline NodeStatus RosTopicSubNode<T>::onRunning()
 {
+  if(!sub_instance_)
+  {
+    if(!createSubscriber(topic_name_))
+    {
+      return NodeStatus::RUNNING;
+    }
+  }
+
   // Spin the subscriber to process any new message that has been received since the last tick
   sub_instance_->callback_group_executor.spin_some();
 
