@@ -14,12 +14,12 @@
 
 #pragma once
 
+#include <behaviortree_cpp/action_node.h>
+#include <behaviortree_cpp/basic_types.h>
 #include <memory>
 #include <string>
 #include <rclcpp/executors.hpp>
 #include <rclcpp/allocator/allocator_common.hpp>
-#include "behaviortree_cpp/condition_node.h"
-#include "behaviortree_cpp/bt_factory.h"
 
 #include "behaviortree_ros2/ros_node_params.hpp"
 #include <boost/signals2.hpp>
@@ -42,7 +42,7 @@ namespace BT
  * 2. Otherwise, use the value in RosNodeParams::default_port_value
  */
 template <class TopicT>
-class RosTopicSubNode : public BT::ConditionNode
+class RosTopicSubNode : public BT::StatefulActionNode
 {
 public:
   // Type definitions
@@ -131,9 +131,13 @@ public:
     return providedBasicPorts({});
   }
 
-  NodeStatus tick() override final;
+  NodeStatus onStart() override final;
 
-  /** Callback invoked in the tick. You must return either SUCCESS of FAILURE
+  NodeStatus onRunning() override final;
+
+  void onHalted() override final;
+
+  /** Callback invoked in the tick. You must return SUCCESS, FAILURE, or RUNNING.
    *
    * @param last_msg the latest message received, since the last tick.
    *                  Will be empty if no new message received.
@@ -157,6 +161,8 @@ public:
 
 private:
   bool createSubscriber(const std::string& topic_name);
+
+  NodeStatus checkStatus(const NodeStatus& status) const;
 };
 
 //----------------------------------------------------------------
@@ -187,51 +193,15 @@ template <class T>
 inline RosTopicSubNode<T>::RosTopicSubNode(const std::string& instance_name,
                                            const NodeConfig& conf,
                                            const RosNodeParams& params)
-  : BT::ConditionNode(instance_name, conf), node_(params.nh)
+  : BT::StatefulActionNode(instance_name, conf), node_(params.nh)
 {
-  // check port remapping
-  auto portIt = config().input_ports.find("topic_name");
-  if(portIt != config().input_ports.end())
+  // Check if default_port_value was used to provide a topic name.
+  if(!params.default_port_value.empty())
   {
-    const std::string& bb_topic_name = portIt->second;
+    topic_name_ = params.default_port_value;
+  }
 
-    if(bb_topic_name.empty() || bb_topic_name == "__default__placeholder__")
-    {
-      if(params.default_port_value.empty())
-      {
-        throw std::logic_error("Both [topic_name] in the InputPort and the RosNodeParams "
-                               "are empty.");
-      }
-      else
-      {
-        createSubscriber(params.default_port_value);
-      }
-    }
-    else if(!isBlackboardPointer(bb_topic_name))
-    {
-      // If the content of the port "topic_name" is not
-      // a pointer to the blackboard, but a static string, we can
-      // create the client in the constructor.
-      createSubscriber(bb_topic_name);
-    }
-    else
-    {
-      // do nothing
-      // createSubscriber will be invoked in the first tick().
-    }
-  }
-  else
-  {
-    if(params.default_port_value.empty())
-    {
-      throw std::logic_error("Both [topic_name] in the InputPort and the RosNodeParams "
-                             "are empty.");
-    }
-    else
-    {
-      createSubscriber(params.default_port_value);
-    }
-  }
+  // If no value was provided through the params, assume that the topic name will be set through a port when the node is first ticked.
 }
 
 template <class T>
@@ -282,40 +252,42 @@ inline bool RosTopicSubNode<T>::createSubscriber(const std::string& topic_name)
   signal_connection_ = sub_instance_->broadcaster.connect(
       [this](const std::shared_ptr<T> msg) { last_msg_ = msg; });
 
-  topic_name_ = topic_name;
   return true;
 }
+template <class T>
+inline NodeStatus RosTopicSubNode<T>::checkStatus(const NodeStatus& status) const
+{
+  if(!isStatusActive(status))
+  {
+    throw std::logic_error("RosTopicSubNode: the callback must return SUCCESS, FAILURE, "
+                           "or RUNNING");
+  }
+  return status;
+};
 
 template <class T>
-inline NodeStatus RosTopicSubNode<T>::tick()
+inline NodeStatus RosTopicSubNode<T>::onStart()
 {
-  // First, check if the subscriber_ is valid and that the name of the
-  // topic_name in the port didn't change.
-  // otherwise, create a new subscriber
-  std::string topic_name;
-  getInput("topic_name", topic_name);
-
-  if(!topic_name.empty() && topic_name != "__default__placeholder__" &&
-     topic_name != topic_name_)
+  // If the topic name was provided through an input port, is a valid topic name, and is different from the stored topic name, update the stored topic name to the new string.
+  if(const auto topic_name = getInput<std::string>("topic_name");
+     topic_name.has_value() && !topic_name->empty() &&
+     topic_name.value() != "__default__placeholder__" && topic_name != topic_name_)
   {
-    sub_instance_.reset();
+    topic_name_ = topic_name.value();
   }
 
-  if(!sub_instance_)
-  {
-    createSubscriber(topic_name);
-  }
+  createSubscriber(topic_name_);
 
-  auto CheckStatus = [](NodeStatus status) {
-    if(!isStatusCompleted(status))
-    {
-      throw std::logic_error("RosTopicSubNode: the callback must return"
-                             "either SUCCESS or FAILURE");
-    }
-    return status;
-  };
+  // Check to see if the subscriber has received a message since we initially created it.
   sub_instance_->callback_group_executor.spin_some();
-  auto status = CheckStatus(onTick(last_msg_));
+
+  // If no message was received, return RUNNING
+  if(last_msg_ == nullptr)
+  {
+    return NodeStatus::RUNNING;
+  }
+
+  auto status = checkStatus(onTick(last_msg_));
   if(!latchLastMessage())
   {
     last_msg_.reset();
@@ -323,4 +295,30 @@ inline NodeStatus RosTopicSubNode<T>::tick()
   return status;
 }
 
+template <class T>
+inline NodeStatus RosTopicSubNode<T>::onRunning()
+{
+  // Spin the subscriber to process any new message that has been received since the last tick
+  sub_instance_->callback_group_executor.spin_some();
+
+  // If no message was received, return RUNNING
+  if(last_msg_ == nullptr)
+  {
+    return NodeStatus::RUNNING;
+  }
+
+  // TODO(schornakj): handle timeout here
+
+  auto status = checkStatus(onTick(last_msg_));
+
+  if(!latchLastMessage())
+  {
+    last_msg_.reset();
+  }
+  return status;
+}
+
+template <class T>
+inline void RosTopicSubNode<T>::onHalted()
+{}
 }  // namespace BT
