@@ -318,6 +318,13 @@ inline NodeStatus RosTopicSubNode<T>::onStart()
     return NodeStatus::RUNNING;
   }
 
+  // Discard any previous message unless latching is enabled.
+  // This enforces that the message must have been received after the current call to onStart(), even if this node has been ticked to completion previously.
+  if(!latchLastMessage())
+  {
+    last_msg_.reset();
+  }
+
   // NOTE(schornakj): Something weird is happening here that prevents the subscriber from receiving a message if the publisher both initializes and publishes a message in between ticks.
   // I think it has to do with the discovery process between the publisher and subscriber and how that relates to events being handled by the executor.
   // This might depend on the middleware implemenation too.
@@ -363,10 +370,6 @@ inline NodeStatus RosTopicSubNode<T>::onRunning()
 
   auto status = checkStatus(onTick(last_msg_));
 
-  if(!latchLastMessage())
-  {
-    last_msg_.reset();
-  }
   return status;
 }
 
