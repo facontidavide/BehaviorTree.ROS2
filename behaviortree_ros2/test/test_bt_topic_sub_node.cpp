@@ -202,4 +202,39 @@ TEST_F(TestBtTopicSubNode, PublisherCreatedAfterFirstTick)
   // THEN it succeeds
   EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));
 }
+
+TEST_F(TestBtTopicSubNode, ExceptionIfNoTopic)
+{
+  // GIVEN the blackboard does not contain the topic name
+
+  // GIVEN the input params do not contain the topic name
+  RosNodeParams params;
+  params.nh = node_;
+
+  // GIVEN we pass in the params and the blackboard when creating the BT node
+  SubNode bt_node("test_node", config_, params);
+
+  // WHEN the BT node is ticked
+  // THEN it throws an exception
+  EXPECT_THROW(bt_node.executeTick(), BT::RuntimeError);
+}
+
+TEST_F(TestBtTopicSubNode, ExceptionIfRosNodeReset)
+{
+  // GIVEN the blackboard does not contain the topic name
+
+  // GIVEN the input params do not contain the topic name
+  RosNodeParams params;
+  params.nh = node_;
+
+  // GIVEN we pass in the params and the blackboard when creating the BT node
+  SubNode bt_node("test_node", config_, params);
+
+  // GIVEN the ROS node is reset prior to the first tick
+  node_.reset();
+
+  // WHEN the BT node is ticked
+  // THEN it throws an exception
+  EXPECT_THROW(bt_node.executeTick(), BT::RuntimeError);
+}
 }  // namespace BT
