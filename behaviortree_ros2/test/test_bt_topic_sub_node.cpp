@@ -4,13 +4,12 @@
 #include <behaviortree_ros2/bt_topic_sub_node.hpp>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <rclcpp/executor.hpp>
 #include <rclcpp/executors.hpp>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/utilities.hpp>
 #include <std_msgs/msg/empty.hpp>
-
-#include <chrono>
-#include <thread>
 
 namespace
 {
@@ -54,16 +53,11 @@ public:
 
     BT::assignDefaultRemapping<SubNode>(config_);
     config_.blackboard = Blackboard::create();
-
-    executor_thread_ = std::thread([this]() { rclcpp::spin(node_); });
   }
 
   void TearDown() override
   {
-    // std::this_thread::sleep_for(std::chrono::seconds(15));
-
     rclcpp::shutdown();
-    executor_thread_.join();
   }
 
   void createPublisher(const rclcpp::QoS& qos)
@@ -75,18 +69,10 @@ public:
   std::shared_ptr<rclcpp::Publisher<Empty>> publisher_;
 
   NodeConfig config_;
-
-private:
-  std::thread executor_thread_;
 };
 
 TEST_F(TestBtTopicSubNode, TopicAsParam)
 {
-  // Problems: exception thrown upon creation
-  // The BT node's executor needs to be spun once to register its subscriber with the publisher, and then spun a second time to actually receive the message.
-  // This causes sort of weird behavior -- if the subscriber is created in the constructor, then it alwaus functions like a latched topic for its first tick, and then follows the setting for remaining ticks.
-  // Probably always want to create the subscriber in the first tick if possible, since this lets us check QoS too.
-
   // GIVEN the blackboard does not contain the topic name
 
   // GIVEN the input params contain the topic name
@@ -189,7 +175,7 @@ TEST_F(TestBtTopicSubNode, QoSBestEffort)
   EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));
 }
 
-TEST_F(TestBtTopicSubNode, PublisherNotAvailableAtStart)
+TEST_F(TestBtTopicSubNode, PublisherCreatedAfterFirstTick)
 {
   // GIVEN the blackboard does not contain the topic name
 
@@ -204,15 +190,14 @@ TEST_F(TestBtTopicSubNode, PublisherNotAvailableAtStart)
   // GIVEN the BT node is RUNNING before the publisher is created
   ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
 
-  // GIVEN we create publisher with BestEffort reliability QoS settings after creating the BT node and after the node starts ticking
-  createPublisher(rclcpp::QoS(kHistoryDepth).best_effort());
+  // GIVEN we create publisher with Reliable reliability QoS settings after creating the BT node and after the node starts ticking
+  createPublisher(rclcpp::QoS(kHistoryDepth).reliable());
 
   // TODO(Joe): Why does the node need to be ticked in between the publisher appearing and sending a message for the message to be received? Seems highly suspicious!
   ASSERT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::RUNNING));
 
   // GIVEN the publisher has published a message
   publisher_->publish(std_msgs::build<Empty>());
-
   // WHEN the BT node is ticked
   // THEN it succeeds
   EXPECT_THAT(bt_node.executeTick(), testing::Eq(NodeStatus::SUCCESS));

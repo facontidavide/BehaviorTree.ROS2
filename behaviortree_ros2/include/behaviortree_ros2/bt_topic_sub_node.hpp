@@ -220,7 +220,7 @@ inline bool RosTopicSubNode<T>::createSubscriber(const std::string& topic_name)
   }
   if(sub_instance_)
   {
-    throw RuntimeError("Can't call createSubscriber more than once");
+    throw RuntimeError("Subscriber already exists");
   }
 
   auto node = node_.lock();
@@ -312,21 +312,16 @@ inline NodeStatus RosTopicSubNode<T>::onStart()
     topic_name_ = topic_name.value();
   }
 
+  // If we fail to create a subscriber, exit early and try again on the next tick
   if(!createSubscriber(topic_name_))
   {
     return NodeStatus::RUNNING;
   }
 
-  // NOTE(schornakj): rclcpp's spin_some function handles all queued work on the executor.
-  // However, the discovery interaction between the publisher and subscriber is also handled through
-  // this queue, and the process of receiving a published message is added to the queue only after
-  // the publisher and subscriber are connected.
-  // This means we need to call spin_some twice to ensure all possible communication is handled between
-  // our subscriber and a publisher. It's important to do this to avoid failure to receive messages
-  // in situations where the publisher has both appeared and sent a message in between ticks.
-  // This behavior might depend on the ROS middleware implementation.
+  // NOTE(schornakj): Something weird is happening here that prevents the subscriber from receiving a message if the publisher both initializes and publishes a message in between ticks.
+  // I think it has to do with the discovery process between the publisher and subscriber and how that relates to events being handled by the executor.
+  // This might depend on the middleware implemenation too.
 
-  sub_instance_->callback_group_executor.spin_some();
   sub_instance_->callback_group_executor.spin_some();
 
   // If no message was received, return RUNNING
@@ -346,15 +341,16 @@ inline NodeStatus RosTopicSubNode<T>::onStart()
 template <class T>
 inline NodeStatus RosTopicSubNode<T>::onRunning()
 {
+  // If the subscriber wasn't initialized during onStart(), attempt to create it here.
   if(!sub_instance_)
   {
+    // If the subscriber still cannot be created, return RUNNING and try again on the next tick.
     if(!createSubscriber(topic_name_))
     {
       return NodeStatus::RUNNING;
     }
   }
 
-  sub_instance_->callback_group_executor.spin_some();
   sub_instance_->callback_group_executor.spin_some();
 
   // If no message was received, return RUNNING
