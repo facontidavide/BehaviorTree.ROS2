@@ -97,7 +97,18 @@ public:
   explicit RosActionNode(const std::string& instance_name, const BT::NodeConfig& conf,
                          const RosNodeParams& params);
 
-  virtual ~RosActionNode() = default;
+  virtual ~RosActionNode()
+  {
+    std::unique_lock lk(getMutex());
+    auto& registry = getRegistry();
+    for(auto it = registry.begin(); it != registry.end(); ) {
+      if (it->second.expired()) {
+        it = registry.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
 
   /**
    * @brief Any subclass of RosActionNode that has ports must implement a
@@ -229,7 +240,6 @@ private:
 
   rclcpp::Time time_goal_sent_;
   NodeStatus on_feedback_state_change_;
-  bool goal_received_;
   WrappedResult result_;
 
   bool createClient(const std::string& action_name);
@@ -302,21 +312,24 @@ inline bool RosActionNode<T>::createClient(const std::string& action_name)
     throw RuntimeError("The ROS node went out of scope. RosNodeParams doesn't take the "
                        "ownership of the node.");
   }
-  action_client_key_ = std::string(node->get_fully_qualified_name()) + "/" + action_name;
 
-  auto& registry = getRegistry();
-  auto it = registry.find(action_client_key_);
-  if(it == registry.end() || it->second.expired())
+  const auto key = std::string(node->get_fully_qualified_name()) + "/" + action_name;
+  if(key != action_client_key_ || action_name_ != action_name || !client_instance_)
   {
-    client_instance_ = std::make_shared<ActionClientInstance>(node, action_name);
-    registry.insert({ action_client_key_, client_instance_ });
+    auto& registry = getRegistry();
+    auto it = registry.find(key);
+    if(it == registry.end() || it->second.expired())
+    {
+      client_instance_ = std::make_shared<ActionClientInstance>(node, action_name);
+      registry[key] = client_instance_;
+    }
+    else
+    {
+      client_instance_ = it->second.lock();
+    }
+    action_client_key_ = key;
+    action_name_ = action_name;
   }
-  else
-  {
-    client_instance_ = it->second.lock();
-  }
-
-  action_name_ = action_name;
 
   bool found =
       client_instance_->action_client->wait_for_action_server(wait_for_server_timeout_);
@@ -381,7 +394,7 @@ inline NodeStatus RosActionNode<T>::tick()
   {
     setStatus(NodeStatus::RUNNING);
 
-    goal_received_ = false;
+    goal_handle_.reset();
     future_goal_handle_ = {};
     on_feedback_state_change_ = NodeStatus::RUNNING;
     result_ = {};
@@ -417,9 +430,8 @@ inline NodeStatus RosActionNode<T>::tick()
     };
     //--------------------
     goal_options.goal_response_callback =
-        [this](typename GoalHandle::SharedPtr const future_handle) {
-          auto goal_handle_ = future_handle.get();
-          if(!goal_handle_)
+        [this](typename GoalHandle::SharedPtr const goal_handle) {
+          if(!goal_handle || !(*goal_handle))
           {
             RCLCPP_ERROR(logger(), "Goal was rejected by server");
           }
@@ -447,7 +459,7 @@ inline NodeStatus RosActionNode<T>::tick()
     client_instance_->callback_executor.spin_some();
 
     // FIRST case: check if the goal request has a timeout
-    if(!goal_received_)
+    if(!goal_handle_)
     {
       auto nodelay = std::chrono::milliseconds(0);
       auto timeout =
@@ -468,7 +480,6 @@ inline NodeStatus RosActionNode<T>::tick()
       }
       else
       {
-        goal_received_ = true;
         goal_handle_ = future_goal_handle_.get();
         future_goal_handle_ = {};
 
