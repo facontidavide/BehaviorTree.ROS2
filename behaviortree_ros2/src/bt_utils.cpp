@@ -29,14 +29,19 @@ btcpp_ros2_interfaces::msg::NodeStatus ConvertNodeStatus(BT::NodeStatus& status)
   {
     case BT::NodeStatus::RUNNING:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::RUNNING;
+      break;
     case BT::NodeStatus::SUCCESS:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::SUCCESS;
+      break;
     case BT::NodeStatus::FAILURE:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::FAILURE;
+      break;
     case BT::NodeStatus::IDLE:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::IDLE;
+      break;
     case BT::NodeStatus::SKIPPED:
       action_status.status = btcpp_ros2_interfaces::msg::NodeStatus::SKIPPED;
+      break;
   }
 
   return action_status;
