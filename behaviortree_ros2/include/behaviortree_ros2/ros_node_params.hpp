@@ -15,6 +15,8 @@
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
+#include <rcl_action/action_client.h>
+#include <rmw/qos_profiles.h>
 #include <string>
 #include <chrono>
 #include <memory>
@@ -33,6 +35,13 @@ struct RosNodeParams
   // - RosTopicPubNode: name of the topic to publish to
   // - RosTopicSubNode: name of the topic to subscribe to
   std::string default_port_value;
+
+  // Default qos configuration for actions, services and topics
+  rcl_action_client_options_t action_client_options =
+      rcl_action_client_get_default_options();
+  rmw_qos_profile_t service_qos_profile = rmw_qos_profile_services_default;
+  rclcpp::QoS topic_qos =
+      rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
 
   // parameters used only by service client and action clients
 
