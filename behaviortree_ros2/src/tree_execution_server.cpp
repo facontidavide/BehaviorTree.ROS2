@@ -95,9 +95,8 @@ TreeExecutionServer::TreeExecutionServer(const rclcpp::Node::SharedPtr& node)
   };
 
   p_->get_trees_service = node_->create_service<GetTrees>(
-      "get_loaded_trees",
-      [this](const std::shared_ptr<GetTrees::Request> _,
-             std::shared_ptr<GetTrees::Response> response) {
+      "get_loaded_trees", [this](const std::shared_ptr<GetTrees::Request> _,
+                                 std::shared_ptr<GetTrees::Response> response) {
         response->tree_ids = p_->factory.registeredBehaviorTrees();
       });
 
